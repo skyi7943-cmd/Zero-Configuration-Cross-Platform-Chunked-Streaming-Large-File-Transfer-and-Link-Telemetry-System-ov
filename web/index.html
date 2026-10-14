@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark" data-wallpaper="ios26">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Şatafat Media</title>
+
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#05070f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Şatafat Media">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+
+  <script>
+    // 主题尽早应用，避免闪烁；清理旧版缓存
+    (function () {
+      try {
+        var th = localStorage.getItem('satafat_theme');
+        if (th === 'light' || th === 'dark') document.documentElement.setAttribute('data-theme', th);
+      } catch (e) {}
+      if ('caches' in window) {
+        caches.keys().then(function (keys) {
+          keys.forEach(function (k) { if (k !== 'satafat-liquid-glass-v5') caches.delete(k); });
+        });
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="style.css?v=lg5">
+</head>
+<body>
+  <video id="keepAwakeVideo" playsinline loop muted style="display:none;"></video>
+
+  <!-- 动态壁纸：清晰的彩色流动色带，让玻璃的折射肉眼可见 -->
+  <canvas id="liquidWallpaperCanvas" class="wallpaper" aria-hidden="true"></canvas>
+  <div class="wallpaper-vignette" aria-hidden="true"></div>
+
+  <!-- ================= 顶部悬浮玻璃胶囊 ================= -->
+  <header class="topbar lg lg-clear" data-refract data-lg-blur="3" data-lg-strength="30" data-lg-depth="20">
+    <div class="brand">
+      <div class="app-icon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">Şatafat Media</span>
+        <span class="brand-sub" data-i18n="brand_subtitle">局域网千兆互传</span>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button id="btnInstallApp" class="glass-btn btn-sm btn-accent" style="display:none;">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        <span data-i18n="btn_install_app">安装应用</span>
+      </button>
+
+      <div id="deviceBadge" class="device-pill">
+        <span class="status-dot-live" id="wakeLockStatus"></span>
+        <span class="device-icon">💻</span>
+        <span id="deviceName" data-i18n="device_detecting">识别中...</span>
+        <span id="wakeLockText" class="sr-only" data-i18n="wakelock_ready">就绪</span>
+      </div>
+
+      <button id="btnOpenQr" class="glass-btn btn-sm btn-primary-glow">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h3v-3"/></svg>
+        <span data-i18n="btn_scan_qr">扫码互传</span>
+      </button>
+
+      <button id="btnWallpaperCycle" class="glass-icon-btn" title="Wallpaper">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2Z"/></svg>
+      </button>
+
+      <button id="btnThemeToggle" class="glass-icon-btn" title="Theme">
+        <span id="themeIcon">☀️</span>
+      </button>
+
+      <select id="langSelect" class="glass-select" title="Language">
+        <option value="zh">中文</option>
+        <option value="en">EN</option>
+        <option value="tr">TR</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- iOS 大标题 -->
+    <section class="large-title">
+      <span class="eyebrow">LIQUID GLASS · LAN</span>
+      <h1>Şatafat Media</h1>
+    </section>
+
+    <div id="iosNotice" class="notice lg lg-card" data-refract data-lg-blur="10" style="display:none;">
+      <span class="notice-icon">💡</span>
+      <div class="notice-text">
+        <strong data-i18n="ios_notice_title">iPhone / iPad 提示：</strong>
+        <span data-i18n="ios_notice_body">传输超大文件时已自动激活屏幕防休眠保护，请保持 Safari 在当前前台页面。</span>
+      </div>
+      <button class="notice-close" onclick="document.getElementById('iosNotice').style.display='none'">&times;</button>
+    </div>
+
+    <!-- ================= 文件互传 ================= -->
+    <section id="tab-transfer" class="tab-pane active">
+
+      <div class="bento">
+        <!-- 连接卡 -->
+        <article id="accessAddressCard" class="card lg lg-card" data-refract>
+          <header class="card-head">
+            <div class="card-title-row">
+              <span class="sf-icon icon-blue">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+              </span>
+              <h2 class="card-title" data-i18n="other_devices_title">其他设备浏览器访问地址</h2>
+            </div>
+            <span class="glass-tag tag-cyan" data-i18n="same_wifi_badge">同一 Wi-Fi 直连</span>
+          </header>
+
+          <div id="accessUrlPill" class="url-well" title="Copy">
+            <span class="live-dot"></span>
+            <span id="accessUrlText" class="url-text">http://127.0.0.1:5200</span>
+          </div>
+
+          <div class="row-actions">
+            <button id="btnCopyAccessUrl" class="glass-btn">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              <span data-i18n="btn_copy_address">复制网址</span>
+            </button>
+            <button id="btnQuickQr" class="glass-btn btn-primary-glow">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+              <span data-i18n="btn_show_qr">扫码打开</span>
+            </button>
+          </div>
+
+          <div id="multiIpNotice" class="nic-row" style="display:none;">
+            <span class="nic-label" data-i18n="label_other_ips">多网卡切换：</span>
+            <div id="otherIpsContainer" class="nic-pills"></div>
+          </div>
+
+          <div class="separator"></div>
+
+          <div class="storage-row">
+            <span class="sf-icon icon-orange">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <div class="storage-info">
+              <div class="storage-label-line">
+                <span class="storage-label" data-i18n="storage_bar_title">接收端存储位置</span>
+                <span id="storageFreeBadge" class="glass-tag tag-emerald">--</span>
+              </div>
+              <div id="storagePathDisplay" class="storage-path">--</div>
+            </div>
+            <button id="btnOpenChangeDir" class="glass-btn btn-sm">
+              <span data-i18n="btn_change_storage">更改目录</span>
+            </button>
+          </div>
+        </article>
+
+        <!-- 测速卡 -->
+        <article id="speedTestCard" class="card lg lg-card" data-refract>
+          <header class="card-head">
+            <div class="card-title-row">
+              <span class="sf-icon icon-purple">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+              </span>
+              <h2 class="card-title" data-i18n="speedtest_title">双机链路传输测速</h2>
+            </div>
+            <span id="speedTestPeerBadge" class="glass-tag tag-purple" data-i18n="speedtest_ready_badge">扫码后自动测速</span>
+          </header>
+
+          <div class="gauge-wrap">
+            <div class="gauge">
+              <svg class="gauge-svg" viewBox="0 0 140 95">
+                <defs>
+                  <linearGradient id="liquidGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#64d2ff"/>
+                    <stop offset="55%" stop-color="#0a84ff"/>
+                    <stop offset="100%" stop-color="#bf5af2"/>
+                  </linearGradient>
+                </defs>
+                <path class="gauge-track" d="M 16 80 A 54 54 0 0 1 124 80" fill="none" stroke-width="12" stroke-linecap="round"/>
+                <path id="gaugeArcFill" class="gauge-fill" d="M 16 80 A 54 54 0 0 1 124 80" fill="none" stroke="url(#liquidGaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="170" stroke-dashoffset="170"/>
+              </svg>
+              <div class="gauge-readout">
+                <div id="gaugeMainValue" class="gauge-num">--</div>
+                <div id="gaugeMainUnit" class="gauge-unit">MB/s</div>
+              </div>
+            </div>
+
+            <div class="metrics">
+              <div class="metric">
+                <span class="metric-label" data-i18n="metric_ping">延迟 Ping</span>
+                <span class="metric-value"><b id="metricPingVal">--</b><small>ms</small></span>
+              </div>
+              <div class="metric">
+                <span class="metric-label" data-i18n="metric_down">下行</span>
+                <span class="metric-value"><b id="metricDownVal">--</b><small>MB/s</small></span>
+              </div>
+              <div class="metric">
+                <span class="metric-label" data-i18n="metric_up">上行</span>
+                <span class="metric-value"><b id="metricUpVal">--</b><small>MB/s</small></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="wave-well"><canvas id="speedWaveCanvas" width="640" height="76"></canvas></div>
+
+          <div class="speed-foot">
+            <div class="speed-summary">
+              <span id="speedStatusDot" class="summary-dot"></span>
+              <span id="speedSummaryText" data-i18n="speedtest_hint">手机扫码连接后将自动测试双机极限传输速率</span>
+            </div>
+            <button id="btnRunSpeedTest" class="glass-btn btn-primary-glow">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+              <span id="btnRunSpeedTestText" data-i18n="btn_run_speedtest">立即测速</span>
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <!-- 实时传输监测 -->
+      <article id="liveMonitorCard" class="card lg lg-card" data-refract style="display:none;">
+        <header class="card-head">
+          <div class="card-title-row">
+            <span class="sf-icon icon-green pulse">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </span>
+            <h2 class="card-title" data-i18n="live_monitor_title">实时双机传输与对方接收速度监测</h2>
+            <span id="liveMonitorBadge" class="glass-tag tag-cyan">LIVE</span>
+          </div>
+          <span id="queueOverallStats" class="overall-speed">--</span>
+        </header>
+        <div id="tasksList" class="transfer-list"></div>
+        <div id="peerTransfersList" class="transfer-list"></div>
+      </article>
+
+      <!-- 投送区 -->
+      <article id="dropZone" class="card drop-zone lg lg-card" data-refract data-lg-strength="38">
+        <input type="file" id="fileInput" multiple style="display:none;">
+        <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;">
+
+        <div class="ripples" aria-hidden="true"><i></i><i></i><i></i></div>
+
+        <div class="drop-inner">
+          <div class="drop-orb">
+            <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+          </div>
+          <h2 class="drop-title" data-i18n="drop_title">拖拽文件至此投送，或点击选择文件</h2>
+          <p class="drop-sub" data-i18n="drop_desc">支持 100GB+ 大文件流式分片、断点续传、实时监测对方接收下载速度</p>
+          <div class="row-actions center">
+            <button id="btnSelectFiles" class="glass-btn btn-lg btn-primary-glow">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              <span data-i18n="btn_select_files">选择文件 / 视频 / 照片</span>
+            </button>
+            <button id="btnSelectFolder" class="glass-btn btn-lg">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span data-i18n="btn_select_folder">投送文件夹</span>
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <!-- 共享文件 -->
+      <article class="card lg lg-card files-card" data-refract data-lg-blur="12">
+        <header class="card-head">
+          <div class="card-title-row">
+            <span class="sf-icon icon-teal">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            </span>
+            <h2 class="card-title" data-i18n="shared_files_title">局域网共享空间文件</h2>
+            <span id="fileCountBadge" class="glass-tag">0</span>
+          </div>
+          <div class="files-tools">
+            <label class="search-field">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input type="text" id="searchFilesInput" placeholder="搜索文件名..." data-i18n-placeholder="search_placeholder">
+            </label>
+            <button id="btnRefreshFiles" class="glass-icon-btn" title="Refresh">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="table-wrap">
+          <table class="files-table">
+            <thead>
+              <tr>
+                <th data-i18n="th_name">文件名</th>
+                <th data-i18n="th_size">大小</th>
+                <th data-i18n="th_modified">修改时间</th>
+                <th class="th-right" data-i18n="th_actions">操作</th>
+              </tr>
+            </thead>
+            <tbody id="filesTableBody">
+              <tr class="empty-row"><td colspan="4"><div class="empty-vault-state"><div class="empty-glass-orb">💧</div><p data-i18n="empty_files">当前共享空间暂无文件</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <!-- ================= 文字同步 ================= -->
+    <section id="tab-clipboard" class="tab-pane">
+      <article class="card lg lg-card" data-refract data-lg-blur="12">
+        <header class="card-head">
+          <div class="card-title-row">
+            <span class="sf-icon icon-indigo">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+            </span>
+            <div>
+              <h2 class="card-title" data-i18n="clipboard_title">跨设备剪贴板 / 文本即时互传</h2>
+              <p class="card-sub" data-i18n="clipboard_subtitle">手机与电脑秒速同步链接、长文本、代码或口令</p>
+            </div>
+          </div>
+          <span id="clipboardTime" class="glass-tag">--</span>
+        </header>
+        <textarea id="clipboardInput" class="glass-textarea" placeholder="..." data-i18n-placeholder="clipboard_placeholder"></textarea>
+        <div class="row-actions">
+          <button id="btnSendClipboard" class="glass-btn btn-lg btn-primary-glow">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+            <span data-i18n="btn_send_clipboard">发送到局域网</span>
+          </button>
+          <button id="btnCopyClipboard" class="glass-btn btn-lg">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            <span data-i18n="btn_copy_clipboard">一键复制内容</span>
+          </button>
+        </div>
+      </article>
+    </section>
+
+    <footer class="page-foot">
+      <span data-i18n="footer_title">Şatafat Media</span>
+      <span id="serverInfoBadge" data-i18n="server_ready">引擎就绪</span>
+    </footer>
+  </main>
+
+  <!-- ================= iOS 26 悬浮标签栏 ================= -->
+  <nav class="dock" aria-label="Tabs">
+    <div class="dock-bar lg lg-clear" data-refract data-lg-blur="2.5" data-lg-strength="36" data-lg-depth="22">
+      <span class="seg-thumb" aria-hidden="true"></span>
+      <button class="seg-btn active" data-tab="transfer">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3"/><path d="M17 17H6l3 3"/></svg>
+        <span data-i18n="tab_transfer">文件互传</span>
+      </button>
+      <button class="seg-btn" data-tab="clipboard">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        <span data-i18n="tab_clipboard">文字同步</span>
+      </button>
+    </div>
+    <button id="btnDockSend" class="dock-fab lg lg-clear" data-refract data-lg-blur="2.5" data-lg-strength="30" title="Send">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </nav>
+
+  <!-- ================= 弹窗：存储目录 ================= -->
+  <div id="storageModal" class="sheet-backdrop" style="display:none;">
+    <div class="sheet lg lg-card" data-refract data-lg-blur="16">
+      <div class="sheet-head">
+        <h3 data-i18n="modal_storage_title">📁 自定义接收端保存目录</h3>
+        <button id="btnCloseStorageModal" class="glass-icon-btn">&times;</button>
+      </div>
+      <p class="sheet-desc" data-i18n="modal_storage_desc">其他设备向本机发送的文件将直接写入此目录。</p>
+      <label class="field-label" data-i18n="modal_quick_drives">快捷磁盘分区选择：</label>
+      <div id="quickDrivesContainer" class="drives-grid"></div>
+      <label for="customStorageInput" class="field-label" data-i18n="modal_storage_input_label">当前 / 自定义绝对路径：</label>
+      <input type="text" id="customStorageInput" class="glass-input mono-input" placeholder="E:\LAN_Share">
+      <div class="sheet-foot">
+        <button id="btnCancelStorage" class="glass-btn" data-i18n="btn_cancel">取消</button>
+        <button id="btnSaveStorage" class="glass-btn btn-primary-glow" data-i18n="btn_save_switch">保存并切换</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 弹窗：二维码 ================= -->
+  <div id="qrModal" class="sheet-backdrop" style="display:none;">
+    <div class="sheet lg lg-card text-center" data-refract data-lg-blur="16">
+      <div class="sheet-head">
+        <h3 data-i18n="modal_qr_title">📱 扫码连接并自动测速</h3>
+        <button id="btnCloseQr" class="glass-icon-btn">&times;</button>
+      </div>
+      <div class="qr-frame"><div id="qrcode"></div></div>
+      <p class="sheet-desc" data-i18n="modal_qr_tip">使用 iPhone 相机或安卓浏览器扫码</p>
+      <div class="qr-ip-row">
+        <label for="ipSelect" class="field-label inline" data-i18n="label_network_ip">局域网网卡 IP：</label>
+        <select id="ipSelect" class="glass-select"></select>
+      </div>
+      <div class="qr-url-row">
+        <input type="text" id="directUrlInput" readonly class="glass-input mono-input">
+        <button id="btnCopyUrl" class="glass-btn btn-primary-glow" data-i18n="btn_copy_url">复制链接</button>
+      </div>
+      <p class="sheet-note" data-i18n="modal_qr_note">请确保手机与电脑连接在同一个 Wi-Fi 下</p>
+    </div>
+  </div>
+
+  <!-- ================= 弹窗：iOS 安装 ================= -->
+  <div id="iosInstallModal" class="sheet-backdrop" style="display:none;">
+    <div class="sheet lg lg-card" data-refract data-lg-blur="16">
+      <div class="sheet-head">
+        <h3 data-i18n="modal_ios_install_title">📱 添加到 iPhone 主屏幕</h3>
+        <button id="btnCloseIosInstall" class="glass-icon-btn">&times;</button>
+      </div>
+      <ol class="steps">
+        <li><span class="step-num">1</span><div><strong data-i18n="ios_step1_title">点击 Safari 底部栏“分享”图标</strong><p data-i18n="ios_step1_desc">⎋</p></div></li>
+        <li><span class="step-num">2</span><div><strong data-i18n="ios_step2_title">选择“添加到主屏幕”</strong><p data-i18n="ios_step2_desc">➕</p></div></li>
+        <li><span class="step-num">3</span><div><strong data-i18n="ios_step3_title">点击右上角“添加”</strong><p data-i18n="ios_step3_desc"></p></div></li>
+      </ol>
+      <button id="btnGotItIos" class="glass-btn btn-lg btn-primary-glow btn-block" data-i18n="btn_got_it">我知道了</button>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-stack"></div>
+
+  <script src="qrcode.min.js?v=lg5"></script>
+  <script src="liquid-glass.js?v=lg5"></script>
+  <script src="app.js?v=lg5"></script>
+</body>
+</html>
